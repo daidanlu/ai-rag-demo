@@ -1,0 +1,16 @@
+# Python Environment Files
+.venv/
+__pycache__/
+
+# Dependencies compiled by Python
+*.pyc
+*.pyd
+
+# RAG Index Files
+db/              # 忽略 RAG 索引数据库文件夹
+
+# LLM Models
+*.gguf
+
+# Operating System Files
+.DS_Store
