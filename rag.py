@@ -179,22 +179,16 @@ def _resolve_gpt4all_model(model: str) -> tuple[str, str | None]:
 
 
 def call_llamacpp(prompt: str, model_path: str, max_tokens: int = 256) -> str:
-    # 确保 llama-cpp-python 已经安装
     try:
         from llama_cpp import Llama
     except Exception as e:
         return f"[ERROR] llama-cpp-python not installed: {e}"
 
-    # 注意：我们直接使用 model_path，跳过 gpt4all 的模型解析逻辑
-    # 我们知道 DLLs 应该工作，因为我们是纯CPU编译的
-
     try:
-        # Llama.cpp 初始化参数：
-        # n_gpu_layers=0 确保只使用 CPU
         m = Llama(
             model_path=model_path,
-            n_ctx=2048,  # 上下文长度，可调整
-            n_gpu_layers=0,  # 强制使用 CPU
+            n_ctx=2048, # context length
+            n_gpu_layers=0,  # force CPU usage
             verbose=False,
         )
 
