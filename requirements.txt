@@ -6,3 +6,4 @@ streamlit==1.39.0
 llama-cpp-python
 scikit-learn==1.7.2
 numpy==2.3.3
+requests
