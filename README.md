@@ -115,6 +115,29 @@ Optional Fields:
 
 ---
 
+## Qdrant (Dockerized Vector Database Integration)
+
+An backend extension for persistent vector storage using **[Qdrant](https://qdrant.tech)** — a high-performance vector search engine.
+
+This replaces the previous in-memory index with a Dockerized service that supports scalable, persistent embeddings and approximate nearest-neighbor search.
+
+```bash
+# 1. Run Qdrant in Docker
+docker run -d --name qdrant -p 6333:6333 -p 6334:6334 -v qdrant_data:/qdrant/storage qdrant/qdrant
+
+# 2. Run local Python test (verify connectivity)
+python qdrant_try.py
+```
+
+Expected output:
+```
+upsert ok: {...}
+search result: {...}
+```
+
+This confirms successful vector ingestion and retrieval on Windows + Docker within an isolated Python venv environment.
+
+
 ## Notes
 
 ```
