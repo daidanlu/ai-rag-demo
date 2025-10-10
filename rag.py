@@ -1,10 +1,11 @@
 # rag.py (RAGService Class using NumPy/Sklearn)
 from __future__ import annotations
 import glob, json, os, re, sys, uuid
-from typing import List, Tuple, Dict, Any
+from typing import Any
 import numpy as np
 from pypdf import PdfReader
-from sklearn.neighbors import NearestNeighbors
+
+# from sklearn.neighbors import NearestNeighbors
 from sentence_transformers import SentenceTransformer
 
 # Configuration (remains global for now)
@@ -14,6 +15,16 @@ TEXT_PATH = os.path.join(DB_DIR, "chunks.json")
 META_PATH = os.path.join(DB_DIR, "metas.json")
 EMB_PATH = os.path.join(DB_DIR, "embeddings.npy")
 DEFAULT_GPT4ALL_MODEL = "Llama-3.2-1B-Instruct-Q4_0.gguf"
+USE_QDRANT = os.getenv("RAG_STORAGE", "memory").lower() == "qdrant"
+# switcher for Qdrant
+if USE_QDRANT:
+    try:
+        from rag_backend.storage_qdrant import QdrantStorage
+
+        _qdrant = QdrantStorage()
+    except Exception as e:
+        print(f"[ERROR] Qdrant init failed: {e}", file=sys.stderr)
+        USE_QDRANT = False
 
 
 # Utility Functions (Chunking/Loading PDFs)
@@ -98,8 +109,10 @@ class RAGService:
             print(f"[ERROR] Failed to load RAG index files: {e}", file=sys.stderr)
             return None, None, None
 
-    def _fit_nn(self, embs: np.ndarray) -> NearestNeighbors:
-        # use NN of scikit-learn to train vector indexing model
+    def _fit_nn(self, embs: np.ndarray) -> Any:
+        # use NN of scikit-learn to train vector indexing model, import as need
+        from sklearn.neighbors import NearestNeighbors
+
         nn = NearestNeighbors(
             n_neighbors=min(embs.shape[0], 50), metric="cosine"
         )  # use cosine similarity to search
@@ -141,11 +154,55 @@ class RAGService:
             convert_to_numpy=True,
             normalize_embeddings=True,  # to ensure the accuracy of cosine similarity search
         )
-        self._save_index(embs, metas, all_chunks)
+
+        # switcher for Qdrant
+        if USE_QDRANT:
+            payloads = []
+            for m, ch in zip(metas, all_chunks):
+                payloads.append(
+                    {
+                        "qid": m.get("id"),
+                        "doc_id": m["doc_id"],
+                        "chunk_idx": m["chunk_idx"],
+                        "text": ch,
+                    }
+                )
+
+            _qdrant.upsert(vectors=embs.tolist(), payloads=payloads)
+        else:
+            self._save_index(embs, metas, all_chunks)
+
         print(f"[OK] Ingested {len(docs)} docs, {len(all_chunks)} chunks.")
         return len(all_chunks)
 
     def retrieve(self, query: str, k: int = 4) -> List[Dict[str, Any]]:
+        # switcher for Qdrant
+        if USE_QDRANT:
+            q_emb = (
+                self._load_embedding_model()
+                .encode([query], convert_to_numpy=True, normalize_embeddings=True)[0]
+                .tolist()
+            )
+            hits = _qdrant.search(q_emb, k=k)
+            out = []
+            for h in hits:
+                p = h.get("payload", {})
+                out.append(
+                    {
+                        "id": p.get("qid") or p.get("id") or h.get("id"),
+                        "text": p.get("text", ""),
+                        "meta": {
+                            "doc_id": p.get("doc_id"),
+                            "chunk_idx": p.get("chunk_idx"),
+                        },
+                        "distance": 1.0
+                        - float(
+                            h.get("score", 0.0)
+                        ),  # default similarity measurement: score, to be consistent with distance format
+                    }
+                )
+            return out
+
         embs, metas, chunks = self._load_index()
         if embs is None:
             print("[INFO] No index found. Please run ingest first.")
