@@ -138,6 +138,78 @@ search result: {...}
 This confirms successful vector ingestion and retrieval on Windows + Docker within an isolated Python venv environment.
 
 
+## Qdrant (Dockerized Vector Database Integration)
+
+An optional backend extension for **persistent vector storage** using **[Qdrant](https://qdrant.tech)** — a high‑performance vector search engine.  
+This complements the default in‑memory index and enables scalable, durable ANN search.
+
+### 1) Run Qdrant (Docker)
+```bash
+docker run -d --name qdrant   -p 6333:6333 -p 6334:6334   -v qdrant_data:/qdrant/storage   qdrant/qdrant
+# If port 6333 is taken, map to another host port, e.g. -p 16333:6333
+```
+
+### 2) Enable Qdrant in this project (env variables)
+**Windows (PowerShell):**
+```powershell
+$env:RAG_STORAGE="qdrant"
+$env:QDRANT_URL="http://127.0.0.1:6333"   # or http://127.0.0.1:16333 if remapped
+$env:QDRANT_COLLECTION="chunks"
+$env:EMBED_DIM="384"
+```
+
+**macOS/Linux (bash/zsh):**
+```bash
+export RAG_STORAGE=qdrant
+export QDRANT_URL=http://127.0.0.1:6333
+export QDRANT_COLLECTION=chunks
+export EMBED_DIM=384
+```
+
+### 3) Verify connectivity (optional local script)
+```bash
+python qdrant_try.py
+```
+Expected output:
+```
+upsert ok: {...}
+search result: {...}
+```
+
+### 4) Ingest & Query (CLI)
+```bash
+# Ingest PDFs (writes vectors to Qdrant)
+python main.py ingest data/*.pdf
+
+# Retrieve only (skip generation) — quicker for testing
+python main.py ask "What is the document about?" --no-generate --show-snippets
+
+# Full RAG with local LLM (llama-cpp)
+python main.py ask "What is the document about?" --k 4
+```
+
+### 5) How it works (internal)
+- When `RAG_STORAGE=qdrant`, the backend writes/reads vectors via `rag_backend/storage_qdrant.py`.
+- Retrieval returns payload fields `doc_id`, `chunk_idx`, and `text`. CLI maps these to `Sources`.
+
+### 6) Troubleshooting
+- **400 Bad Request on upsert** → Point `id` must be **UUID or unsigned integer**. The adapter auto‑generates UUIDs; custom IDs are stored as `payload.qid`.
+- **Vector size mismatch** → Ensure the collection is `size=384`. Delete and recreate if needed:
+  ```bash
+  curl -X DELETE http://127.0.0.1:6333/collections/chunks
+  ```
+- **No sources / meta=None** → Ensure search request includes `"with_payload": true` and the CLI reads `meta.doc_id / meta.chunk_idx`.
+
+### 7) Switch back to in‑memory (dev mode)
+```bash
+# Unset the variable or set to "memory"
+$env:RAG_STORAGE="memory"   # PowerShell
+# or
+export RAG_STORAGE=memory   # bash/zsh
+```
+
+---
+
 ## Notes
 
 ```
