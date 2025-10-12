@@ -8,6 +8,7 @@ from typing import Dict, Any
 API_BASE_URL = "http://127.0.0.1:8000/api/v1"
 INGEST_URL = f"{API_BASE_URL}/ingest/"
 QUERY_URL = f"{API_BASE_URL}/query/"
+QUERY_RETRIEVE_URL = f"{API_BASE_URL}/query_retrieve/"
 
 # try:
 #    from rag import ingest_files, answer
@@ -23,6 +24,21 @@ st.set_page_config(page_title="Local RAG Demo", page_icon="search", layout="cent
 
 st.title("Local RAG Demo (Full-Stack)")
 st.caption(f"Frontend running on Streamlit, Backend on Django API ({API_BASE_URL}).")
+
+# Health badge
+try:
+    health = requests.get(f"{API_BASE_URL}/health/", timeout=3).json()
+    storage = health.get("storage", "unknown")
+    alive = health.get("qdrant", {}).get("alive", None)
+    badge = f"Backend: **{storage}**"
+    if alive is True:
+        badge += " • Qdrant: ✅"
+    elif alive is False:
+        badge += " • Qdrant: ❌"
+    st.caption(badge)
+except Exception:
+    st.caption("Backend: unreachable")
+
 
 # Settings Expander
 with st.expander("Configuration Settings", expanded=True):
@@ -105,8 +121,9 @@ if run_btn and q.strip():
             if model.strip():
                 payload["model"] = model.strip()
 
-            # send POST request to Django Query API
-            response = requests.post(QUERY_URL, json=payload)
+            # send POST request to Django Query API, choose endpoint by 'dry' flag
+            url = QUERY_RETRIEVE_URL if dry else QUERY_URL
+            response = requests.post(url, json=payload)
 
             # check connection error
             if response.status_code == 500:

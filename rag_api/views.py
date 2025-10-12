@@ -1,14 +1,15 @@
 # rag_api/views.py
 import os
+import requests
+from rag import RAGService
 from rest_framework.views import APIView
+from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.parsers import MultiPartParser, FormParser
-from .serializers import IngestSerializer
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from pathlib import Path
-from rag import RAGService
-from .serializers import QuerySerializer
-from rest_framework.parsers import JSONParser
+
+from .serializers import IngestSerializer, QuerySerializer
 
 rag_service = RAGService()
 
@@ -21,7 +22,6 @@ class IngestAPIView(APIView):
     parser_classes = (MultiPartParser, FormParser)
 
     def post(self, request, *args, **kwargs):
-
         serializer = IngestSerializer(data=request.data)
 
         # 1. ensure file is present
@@ -43,7 +43,6 @@ class IngestAPIView(APIView):
                     destination.write(chunk)
 
             # 3. call the core RAG ingestion logic
-            # pass the file path as a pattern list for the ingest_files method
             chunks_processed = rag_service.ingest_files([str(file_path)])
 
             if chunks_processed > 0:
@@ -66,13 +65,11 @@ class IngestAPIView(APIView):
                 )
 
         except Exception as e:
-            # explicitly returning the error string in the response
-            error_detail = str(e)
             return Response(
                 {
                     "status": "error",
                     "message": "Internal server error during processing.",
-                    "details": error_detail,
+                    "details": str(e),
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
@@ -83,26 +80,27 @@ class QueryAPIView(APIView):
     API endpoint for asking questions against ingested documents.
     """
 
-    # explicitly specify the parser
     parser_classes = (JSONParser,)
 
     def post(self, request, *args, **kwargs):
         serializer = QuerySerializer(data=request.data)
-
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        validated_data = serializer.validated_data
+        validated = serializer.validated_data
+
+        # use bool to handle true/false/1/0/"true"/"false"
+        gen = validated.get("generate", True)
+        if isinstance(gen, str):
+            gen = gen.strip().lower() in ("1", "true", "yes", "y")
 
         try:
-            # 1. calling the answer core logic of RAG service
             result = rag_service.answer(
-                query=validated_data["query"],
-                k=validated_data.get("k", 4),
-                generate=validated_data.get("generate", True),
+                query=validated["query"],
+                k=validated.get("k", 4),
+                generate=gen,
             )
 
-            # 2. handle LLM error fallback, if LLM returns an error string, return status code 500
             if result.get("answer", "").startswith("[ERROR]"):
                 return Response(
                     {
@@ -114,7 +112,6 @@ class QueryAPIView(APIView):
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
-            # 3. success
             return Response(
                 {
                     "status": "success",
@@ -133,3 +130,70 @@ class QueryAPIView(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+@api_view(["POST"])
+def query_retrieve_only(request):
+    try:
+        query = (request.data or {}).get("query", "")
+        k = int((request.data or {}).get("k", 4))
+        if not query:
+            return Response(
+                {"status": "error", "message": "Field 'query' is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        hits = rag_service.retrieve(query, k=k)
+
+        return Response(
+            {"status": "success", "sources": hits}, status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        return Response(
+            {"status": "error", "message": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+# health & config check
+@api_view(["GET"])
+def health(request):
+    """
+    Returns current storage backend and (if Qdrant) a quick connectivity check.
+    """
+    backend = os.getenv("RAG_STORAGE", "memory").lower()
+    info = {"status": "ok", "storage": backend}
+
+    if backend == "qdrant":
+        import requests
+
+        url = os.getenv("QDRANT_URL", "http://127.0.0.1:6333").rstrip("/")
+        coll = os.getenv("QDRANT_COLLECTION", "chunks")
+        info["qdrant"] = {"url": url, "collection": coll}
+
+        try:
+            # 1) ping server root (fast)
+            r0 = requests.get(f"{url}/", timeout=5)
+            server_ok = r0.status_code == 200
+
+            # 2) check collection (also returns points_count)
+            r1 = requests.get(f"{url}/collections/{coll}", timeout=5)
+            collection_ok = r1.status_code == 200
+            points_count = None
+            if collection_ok:
+                try:
+                    points_count = r1.json().get("result", {}).get("points_count")
+                except Exception:
+                    pass
+
+            info["qdrant"]["server_ok"] = server_ok
+            info["qdrant"]["collection_ok"] = collection_ok
+            info["qdrant"]["points_count"] = points_count
+            info["qdrant"]["alive"] = bool(server_ok and collection_ok)
+
+        except Exception as e:
+            info["qdrant"]["alive"] = False
+            info["qdrant"]["error"] = str(e)
+
+    return Response(info, status=status.HTTP_200_OK)
