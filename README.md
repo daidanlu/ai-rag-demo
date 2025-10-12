@@ -187,6 +187,59 @@ export RAG_STORAGE=memory   # bash/zsh
 
 ---
 
+## Qdrant Vector Storage + Django REST API Integration
+
+This update completes the **retrieval and generation pipeline** for the local RAG demo, fully connecting:
+- **Qdrant vector database** (running via Docker)
+- **Django REST backend** (`rag_api`)
+- **Local LLM inference** powered by `llama-cpp-python`
+
+### Key Updates
+
+#### 1. Qdrant Storage Adapter
+Added `rag_backend/storage_qdrant.py` and `storage_factory.py`, supporting:
+- Persistent vector storage via **Qdrant REST API**
+- Collection auto-creation with 384-dimensional cosine distance
+- Upsert and search interfaces integrated with `RAGService`
+
+#### 2. API Endpoints
+Updated `rag_api/views.py` and `urls.py`:
+- `POST /api/v1/ingest/` — Upload & embed PDF files  
+- `POST /api/v1/query/` — Retrieve + generate LLM answers  
+- `POST /api/v1/query_retrieve/` — Retrieve-only mode (for frontend debugging)  
+- `GET /api/v1/health/` — Storage backend and Qdrant status check  
+
+Example (PowerShell):
+```powershell
+$body = @{ query = "Sid Meier"; k = 4 } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/v1/query_retrieve/" -Body $body -ContentType "application/json"
+```
+
+#### 3. Environment Configuration
+Make sure the backend recognizes Qdrant:
+```powershell
+$env:RAG_STORAGE="qdrant"
+$env:QDRANT_URL="http://127.0.0.1:6333"
+$env:QDRANT_COLLECTION="chunks"
+$env:EMBED_DIM="384"
+python manage.py runserver
+```
+
+#### 4. Validation Results
+```text
+[Query] "Sid Meier"  → success (retrieved relevant chunks)
+[Query] "What is the document about?" → success (generated answer)
+[Health] → status: ok, storage: qdrant
+```
+
+### Summary
+- Integrated **Qdrant** as the vector store backend  
+- Extended Django REST API endpoints for ingestion and querying  
+- Verified end-to-end retrieval and answer generation  
+- Confirmed compatibility with PowerShell (`Invoke-RestMethod`)  
+
+---
+
 ## Notes
 
 ```
