@@ -1,6 +1,8 @@
 import os
+import time
 import streamlit as st
 import requests
+from streamlit.components.v1 import html as st_html
 from pathlib import Path
 from typing import Dict, Any
 
@@ -18,26 +20,63 @@ QUERY_RETRIEVE_URL = f"{API_BASE_URL}/query_retrieve/"
 #    )
 #    st.stop()
 
-
-# UI config
-st.set_page_config(page_title="Local RAG Demo", page_icon="search", layout="centered")
-
+# UI header
 st.title("Local RAG Demo (Full-Stack)")
 st.caption(f"Frontend running on Streamlit, Backend on Django API ({API_BASE_URL}).")
+st.caption(f"Streamlit version: {st.__version__}")
 
-# Health badge
-try:
-    health = requests.get(f"{API_BASE_URL}/health/", timeout=3).json()
-    storage = health.get("storage", "unknown")
-    alive = health.get("qdrant", {}).get("alive", None)
-    badge = f"Backend: **{storage}**"
-    if alive is True:
-        badge += " • Qdrant: ✅"
-    elif alive is False:
-        badge += " • Qdrant: ❌"
-    st.caption(badge)
-except Exception:
-    st.caption("Backend: unreachable")
+# Health banner
+colA, colB = st.columns([1, 1])
+
+with colA:
+    health_box = st.empty()
+
+    def render_health_once():
+        """Fetch /health and render one-line badge into health_box."""
+        try:
+            # quick retries for first-load， add ts + no-cache to avoid caching
+            j = None
+            for _ in range(3):
+                try:
+                    r = requests.get(
+                        f"{API_BASE_URL}/health/?_={int(time.time())}",
+                        headers={"Cache-Control": "no-cache"},
+                        timeout=3,
+                    )
+                    j = r.json()
+                    break
+                except Exception:
+                    time.sleep(0.4)
+            if not isinstance(j, dict):
+                raise RuntimeError("health fetch failed")
+
+            storage = j.get("storage", "unknown")
+            alive = (j.get("qdrant") or {}).get("alive", None)
+            badge = f"Backend: **{storage}**"
+            if alive is True:
+                badge += " • Qdrant: ✅"
+            elif alive is False:
+                badge += " • Qdrant: ❌"
+            else:
+                badge += " • Qdrant: ⚪"
+            health_box.caption(badge)
+        except Exception:
+            health_box.caption("Backend: unreachable")
+
+    # render once per run
+    render_health_once()
+
+with colB:
+    auto = st.toggle(
+        "Auto-refresh health (10s)",
+        value=False,
+        key="health_toggle_nonblocking",
+        help="Auto-refresh the health banner without blocking the page.",
+    )
+
+# schedule non-blocking reruns every 10s
+if auto:
+    st.markdown("<meta http-equiv='refresh' content='10'/>", unsafe_allow_html=True)
 
 
 # Settings Expander
