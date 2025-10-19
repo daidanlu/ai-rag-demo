@@ -5,6 +5,7 @@ from rag import RAGService
 from rest_framework.views import APIView
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from rag_backend.storage_factory import clear_storage
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from pathlib import Path
@@ -197,3 +198,11 @@ def health(request):
             info["qdrant"]["error"] = str(e)
 
     return Response(info, status=status.HTTP_200_OK)
+
+
+# POST /api/v1/clear/, drops and recreates the vector index (Qdrant) or clears memory store.
+class ClearAPIView(APIView):
+    def post(self, request):
+        result = clear_storage()
+        status_txt = "success" if result.get("ok") else "failed"
+        return Response({"status": status_txt, "result": result})
