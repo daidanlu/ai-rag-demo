@@ -208,6 +208,7 @@ Updated `rag_api/views.py` and `urls.py`:
 - `POST /api/v1/query/` — Retrieve + generate LLM answers  
 - `POST /api/v1/query_retrieve/` — Retrieve-only mode (for frontend debugging)  
 - `GET /api/v1/health/` — Storage backend and Qdrant status check  
+- `POST /api/v1/clear/` — Reset the vector index has been added
 
 Example (PowerShell):
 ```powershell
@@ -231,6 +232,27 @@ python manage.py runserver
 [Query] "What is the document about?" → success (generated answer)
 [Health] → status: ok, storage: qdrant
 ```
+
+### Health Status API (`GET /api/v1/health/`)
+Reports backend availability and Qdrant connection status.
+
+- Returns JSON with backend storage type, Qdrant collection info, and alive flag  
+- Used by the Streamlit frontend for real-time health monitoring  
+- Example:
+  ```powershell
+  Invoke-RestMethod http://127.0.0.1:8000/api/v1/health/ | ConvertTo-Json
+  # → { "status": "ok", "storage": "qdrant", "qdrant": { "alive": true, ... } }
+
+
+### Clear Index API (`POST /api/v1/clear/`)
+A new backend endpoint for resetting the vector index has been added.
+
+- **Qdrant mode:** Drops and recreates the existing collection via REST API  
+- **Memory mode:** Clears in-memory vectors and embeddings  
+- Verified via PowerShell:
+  ```powershell
+  Invoke-RestMethod -Method POST http://127.0.0.1:8000/api/v1/clear/ | ConvertTo-Json
+  # → { "status": "success", "result": { "ok": true, "collection": "chunks", "reset": true } }
 
 ### Summary
 - Integrated **Qdrant** as the vector store backend  
