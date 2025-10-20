@@ -12,6 +12,14 @@ INGEST_URL = f"{API_BASE_URL}/ingest/"
 QUERY_URL = f"{API_BASE_URL}/query/"
 QUERY_RETRIEVE_URL = f"{API_BASE_URL}/query_retrieve/"
 
+
+# backend clear helper: Call Django /api/v1/clear/ and return JSON result.
+def clear_index_backend() -> dict:
+    r = requests.post(f"{API_BASE_URL}/clear/", timeout=30)
+    r.raise_for_status()
+    return r.json()
+
+
 # try:
 #    from rag import ingest_files, answer
 # except ImportError:
@@ -74,8 +82,10 @@ with colB:
         help="Auto-refresh the health banner without blocking the page.",
     )
 
-# schedule non-blocking reruns every 10s
-if auto:
+
+# schedule non-blocking reruns every 10s (pause when busy)
+busy = st.session_state.get("busy", False)
+if auto and not busy:
     st.markdown("<meta http-equiv='refresh' content='10'/>", unsafe_allow_html=True)
 
 
@@ -84,6 +94,45 @@ with st.expander("Configuration Settings", expanded=True):
     model = st.text_input("LLM Model (.gguf filename - Read by Django)", value="")
     # Using 'Top-K' for professional retrieval terminology
     k = st.slider("Retrieval Top-K Chunks", 1, 8, 4)
+
+
+# Maintenance section: clear index button
+st.divider()
+st.subheader("Maintenance")
+
+with st.container(border=True):
+    st.caption("Clear the vector index on the backend (Qdrant or in-memory).")
+
+    busy = st.session_state.get("busy", False)
+
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        confirm = st.checkbox("I'm sure", key="confirm_clear_index")
+    with col2:
+        clear_btn = st.button(
+            "Clear Index (backend)",
+            type="primary",
+            disabled=(not confirm) or busy,
+            help="Drop & recreate the collection in Qdrant (or reset memory store).",
+        )
+
+    if clear_btn:
+        st.session_state["busy"] = True  # pause autorefresh
+        try:
+            with st.spinner("Clearing index..."):
+                result = clear_index_backend()
+            ok = bool(result.get("result", {}).get("ok"))
+            if ok:
+                st.success("Index cleared successfully.")
+            else:
+                st.warning(f"Clear API returned: {result}")
+        except requests.HTTPError as e:
+            st.error(f"HTTP error: {e.response.status_code} — {e.response.text[:300]}")
+        except Exception as e:
+            st.error(f"Failed to clear index: {e}")
+        finally:
+            st.session_state["busy"] = False
+            st.rerun()  # immediate light refresh to update health
 
 # 1) Upload and Ingestion calling Django Ingest API
 st.subheader("1) Document Upload and Ingestion")
