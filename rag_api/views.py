@@ -1,5 +1,6 @@
 # rag_api/views.py
 import os
+import time
 import requests
 from rag import RAGService
 from rest_framework.views import APIView
@@ -174,6 +175,7 @@ def health(request):
         info["qdrant"] = {"url": url, "collection": coll}
 
         try:
+            start = time.time()
             # 1) ping server root (fast)
             r0 = requests.get(f"{url}/", timeout=5)
             server_ok = r0.status_code == 200
@@ -192,6 +194,7 @@ def health(request):
             info["qdrant"]["collection_ok"] = collection_ok
             info["qdrant"]["points_count"] = points_count
             info["qdrant"]["alive"] = bool(server_ok and collection_ok)
+            info["latency_ms"] = round((time.time() - start) * 1000, 2)
 
         except Exception as e:
             info["qdrant"]["alive"] = False
