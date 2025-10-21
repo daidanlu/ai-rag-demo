@@ -67,6 +67,12 @@ with colA:
                 badge += " • Qdrant: ❌"
             else:
                 badge += " • Qdrant: ⚪"
+            points = (j.get("qdrant") or {}).get("points_count", None)
+            if points is not None:
+                badge += f" • vectors: {points}"
+            latency = j.get("latency_ms", None)
+            if latency is not None:
+                badge += f" • latency: {latency} ms"
             health_box.caption(badge)
         except Exception:
             health_box.caption("Backend: unreachable")

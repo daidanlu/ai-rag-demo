@@ -208,7 +208,7 @@ Updated `rag_api/views.py` and `urls.py`:
 - `POST /api/v1/query/` — Retrieve + generate LLM answers  
 - `POST /api/v1/query_retrieve/` — Retrieve-only mode (for frontend debugging)  
 - `GET /api/v1/health/` — Storage backend and Qdrant status check  
-- `POST /api/v1/clear/` — Reset the vector index has been added
+- `POST /api/v1/clear/` — Reset the vector index
 
 Example (PowerShell):
 ```powershell
@@ -238,10 +238,17 @@ Reports backend availability and Qdrant connection status.
 
 - Returns JSON with backend storage type, Qdrant collection info, and alive flag  
 - Used by the Streamlit frontend for real-time health monitoring  
+- Also returns `latency_ms` and `qdrant.points_count` for the health banner
 - Example:
   ```powershell
   Invoke-RestMethod http://127.0.0.1:8000/api/v1/health/ | ConvertTo-Json
-  # → { "status": "ok", "storage": "qdrant", "qdrant": { "alive": true, ... } }
+  # → {
+  #     "status": "ok",
+  #     "storage": "qdrant",
+  #     "latency_ms": 3.2,
+  #     "qdrant": { "alive": true, "points_count": 98, ... }
+  #   }
+  ```
 
 
 ### Clear Index API (`POST /api/v1/clear/`)
