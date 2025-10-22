@@ -65,6 +65,22 @@ Note: The Streamlit client uses the Python `requests` library to communicate via
 
 ---
 
+### Multi-PDF Upload & Progress
+
+The Streamlit frontend now supports **batch uploading multiple PDFs** to the backend in one click, with:
+
+- Sequential upload and ingestion of each file  
+- Real-time progress bar and per-file success/failure toast notifications  
+- Automatic refresh of the top-bar health banner (showing updated vector count and latency)
+
+Example workflow:
+1. Select multiple PDFs in the upload area.  
+2. Click **“Ingest Documents”** → see a global progress bar update (0 → 100 %).  
+3. After ingestion, the **health badge** reflects the new `vectors` count immediately.  
+
+
+---
+
 ## Demo Screenshots
 
 ![Streamlit RAG Demo Screenshot](assets/streamlit-demo-1.png)
