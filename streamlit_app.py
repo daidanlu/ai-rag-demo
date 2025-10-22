@@ -143,54 +143,80 @@ with st.container(border=True):
 # 1) Upload and Ingestion calling Django Ingest API
 st.subheader("1) Document Upload and Ingestion")
 uploaded_files = st.file_uploader(
-    "Drag and drop PDF files here", accept_multiple_files=True, type=["pdf"]
+    "Upload PDF(s)", accept_multiple_files=True, type=["pdf"]
 )
 
-if st.button("Ingest Documents"):
-    if not uploaded_files:
-        st.warning("Please upload one or more PDF files first.")
-    else:
-        # to ensure Django server is running
-        try:
-            with st.spinner("Uploading and Ingesting documents via Django API..."):
-                total_chunks = 0
+busy = st.session_state.get("busy", False)
+ingest_btn = st.button(
+    "Ingest Documents",
+    type="primary",
+    disabled=busy or not uploaded_files,
+    help="Upload selected PDF(s) to the Django backend for ingestion.",
+)
 
-                for uploaded_file in uploaded_files:
-                    # prepare fils in multipart/form-data formats
-                    files = {
-                        "pdf_file": (
-                            uploaded_file.name,
-                            uploaded_file,
-                            "application/pdf",
-                        )
-                    }
+if ingest_btn:
+    # to ensure Django server is running
+    st.session_state["busy"] = True  # to prevent interruptions of requests
+    try:
+        total = len(uploaded_files)
+        total_chunks = 0
+        ok_cnt = 0
+        fail_cnt = 0
 
-                    # send POST request to Django Ingest API
-                    response = requests.post(INGEST_URL, files=files)
+        progress = st.progress(0, text=f"Uploading 0/{total}")
 
-                    if response.status_code == 201:
-                        data = response.json()
-                        total_chunks += data.get("chunks_processed", 0)
-                        st.success(
-                            f"Ingested '{uploaded_file.name}'. Processed {data.get('chunks_processed')} chunks."
-                        )
-                    else:
-                        st.error(
-                            f"Failed to ingest '{uploaded_file.name}'. Status: {response.status_code}. Detail: {response.text}"
-                        )
+        for idx, uploaded_file in enumerate(uploaded_files, start=1):
+            with st.spinner(f"Uploading {uploaded_file.name} ({idx}/{total})..."):
 
-                if total_chunks > 0:
-                    st.toast(
-                        f"Total Ingestion Complete: {total_chunks} chunks processed.",
-                        icon="✅",
+                file_bytes = uploaded_file.read()
+                files = {
+                    "pdf_file": (
+                        uploaded_file.name,
+                        file_bytes,
+                        "application/pdf",
                     )
+                }
 
-        except requests.exceptions.ConnectionError:
-            st.error(
-                f"Connection Error: Could not reach Django backend at {API_BASE_URL}. Ensure 'python manage.py runserver' is running."
+                response = requests.post(INGEST_URL, files=files, timeout=120)
+
+            if response.status_code in (200, 201):
+                try:
+                    data = response.json()
+                except Exception:
+                    data = {}
+                ok_cnt += 1
+                chunks = int(data.get("chunks_processed", 0))
+                total_chunks += chunks
+                st.toast(
+                    f"✅ {uploaded_file.name} — processed {chunks} chunks.", icon="✅"
+                )
+            else:
+                fail_cnt += 1
+                st.toast(
+                    f"❌ {uploaded_file.name} — {response.status_code}: {response.text[:200]}",
+                    icon="❌",
+                )
+
+            progress.progress(idx / total, text=f"Uploading {idx}/{total}")
+
+        if ok_cnt > 0:
+            st.success(
+                f"Completed: {ok_cnt}/{total} file(s) ingested, total {total_chunks} chunks."
             )
-        except Exception as e:
-            st.error(f"An unexpected error occurred: {e}")
+        if fail_cnt > 0:
+            st.warning(f"{fail_cnt}/{total} file(s) failed.")
+
+        # rerun to update，health vectors
+        st.rerun()
+
+    except requests.exceptions.ConnectionError:
+        st.error(
+            f"Connection Error: Could not reach Django backend at {API_BASE_URL}. Ensure 'python manage.py runserver' is running."
+        )
+    except Exception as e:
+        st.error(f"An unexpected error occurred: {e}")
+    finally:
+        st.session_state["busy"] = False
 
 
 # 2) Question Answering calling Django Query API
