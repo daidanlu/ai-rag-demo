@@ -72,6 +72,7 @@ The Streamlit frontend now supports **batch uploading multiple PDFs** to the bac
 - Sequential upload and ingestion of each file  
 - Real-time progress bar and per-file success/failure toast notifications  
 - Automatic refresh of the top-bar health banner (showing updated vector count and latency)
+- Support for uploading multiple PDFs with progress feedback and per-file toasts
 
 Example workflow:
 1. Select multiple PDFs in the upload area.  
@@ -268,7 +269,7 @@ Reports backend availability and Qdrant connection status.
 
 
 ### Clear Index API (`POST /api/v1/clear/`)
-A new backend endpoint for resetting the vector index has been added.
+A new backend endpoint for resetting the vector index has been added. Supports both Qdrant and in-memory modes; typically used after testing ingestion to reset the index.
 
 - **Qdrant mode:** Drops and recreates the existing collection via REST API  
 - **Memory mode:** Clears in-memory vectors and embeddings  
