@@ -52,6 +52,10 @@ python main.py ask "What is the document about?"
 
 A simple, local web interface for interacting with the Django Backend Service.
 
+- Displays **end-to-end query latency** (answer generation time)
+- Optional **retrieval inspector toggle** to show top-K retrieved chunks with scores and sources
+
+
 ```bash
 # 1. Start Backend
 # Ensure the Django service is running (see section A above)
