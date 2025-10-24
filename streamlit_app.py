@@ -229,9 +229,16 @@ with col1:
 with col2:
     dry = st.checkbox("Retrieve only (Skip LLM Generation)", value=False)
 
+show_retrieval = st.toggle(
+    "Show retrieval details",
+    value=False,
+    help="Display top-K retrieved chunks with scores and source metadata.",
+)
+
 if run_btn and q.strip():
     try:
         with st.spinner("Querying Django API and processing response..."):
+            start_ts = time.time()  # timing starts
             # prepare JSON Payload for user input
             payload = {
                 "query": q.strip(),
@@ -271,29 +278,32 @@ if run_btn and q.strip():
             # success or after LLM failure 500 fallback
             data = response.json() if response.status_code == 200 else data
             res = {"answer": data.get("answer", ""), "hits": data.get("sources", [])}
+            elapsed_ms = round((time.time() - start_ts) * 1000, 1)  # timing ends
 
             # display results
             st.markdown("---")
             st.markdown("### Generated Answer")
+            st.caption(f"Answer latency: {elapsed_ms} ms")
             st.markdown(res.get("answer", "No answer provided."))
 
-            st.markdown("### Retrieval Sources")
-            hits = res.get("hits", [])
-            if hits:
-                for i, h in enumerate(hits, start=1):
-                    meta = h.get("meta", {})
-                    distance_str = (
-                        f"Distance={h.get('distance',None):.4f}"
-                        if h.get("distance") is not None
-                        else ""
-                    )
-                    st.write(
-                        f"**[{i}]** **Document:** {meta.get('doc_id','?')} • **Chunk Index:** {meta.get('chunk_idx','?')} • {distance_str}"
-                    )
-                    with st.expander(f"View Chunk {i} Content"):
-                        st.code(h.get("text", "N/A"), language="text")
-            else:
-                st.warning("No relevant sources retrieved.")
+            if show_retrieval:
+                st.markdown("### Retrieval Sources")
+                hits = res.get("hits", [])
+                if hits:
+                    for i, h in enumerate(hits, start=1):
+                        meta = h.get("meta", {})
+                        distance_str = (
+                            f"Distance={h.get('distance',None):.4f}"
+                            if h.get("distance") is not None
+                            else ""
+                        )
+                        st.write(
+                            f"**[{i}]** **Document:** {meta.get('doc_id','?')} • **Chunk Index:** {meta.get('chunk_idx','?')} • {distance_str}"
+                        )
+                        with st.expander(f"View Chunk {i} Content"):
+                            st.code(h.get("text", "N/A"), language="text")
+                else:
+                    st.warning("No relevant sources retrieved.")
 
     except requests.exceptions.ConnectionError:
         st.error(
