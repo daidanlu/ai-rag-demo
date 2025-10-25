@@ -250,7 +250,7 @@ if run_btn and q.strip():
 
             # send POST request to Django Query API, choose endpoint by 'dry' flag
             url = QUERY_RETRIEVE_URL if dry else QUERY_URL
-            response = requests.post(url, json=payload)
+            response = requests.post(url, json=payload, timeout=180)
 
             # check connection error
             if response.status_code == 500:
@@ -284,7 +284,15 @@ if run_btn and q.strip():
             st.markdown("---")
             st.markdown("### Generated Answer")
             st.caption(f"Answer latency: {elapsed_ms} ms")
-            st.markdown(res.get("answer", "No answer provided."))
+            answer_text = res.get("answer", "No answer provided.")
+            # to show full answer of long text, preventing trucations by Markdown
+            st.text_area(
+                "Full Answer Output",
+                value=answer_text,
+                height=300,
+                disabled=True,
+                key="answer_box",
+            )
 
             if show_retrieval:
                 st.markdown("### Retrieval Sources")
