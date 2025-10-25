@@ -247,7 +247,7 @@ class RAGService:
         )
 
     @staticmethod
-    def call_llamacpp(prompt: str, model_path: str, max_tokens: int = 256) -> str:
+    def call_llamacpp(prompt: str, model_path: str, max_tokens: int = 1024) -> str:
         try:
             from llama_cpp import Llama
         except Exception as e:
@@ -273,7 +273,7 @@ class RAGService:
         try:
             m = Llama(
                 model_path=resolved_model,
-                n_ctx=2048,
+                n_ctx=4096,
                 n_gpu_layers=0,  # force to use CPU
                 verbose=False,
             )
@@ -281,8 +281,8 @@ class RAGService:
             output = m.create_completion(
                 prompt,
                 max_tokens=max_tokens,
-                temperature=0.0,
-                stop=["\nQuestion:", "Answer:"],
+                temperature=0.2,
+                stop=None,
             )
             return output["choices"][0]["text"].strip()
         except Exception as e:
@@ -293,7 +293,7 @@ class RAGService:
         query: str,
         k: int = 4,
         model: str = DEFAULT_GPT4ALL_MODEL,
-        max_tokens: int = 256,
+        max_tokens: int = 1024,
         generate: bool = True,
     ) -> Dict[str, Any]:
         hits = self.retrieve(query, k=k)
