@@ -1,7 +1,7 @@
 # rag.py (RAGService Class using NumPy/Sklearn)
 from __future__ import annotations
 import glob, json, os, re, sys, uuid
-from typing import Any
+from typing import Any, List, Tuple, Dict
 import numpy as np
 from pypdf import PdfReader
 
@@ -287,6 +287,7 @@ class RAGService:
             return output["choices"][0]["text"].strip()
         except Exception as e:
             return f"[ERROR] Failed to run Llama-CPP ({resolved_model}): {e}"
+        return ""
 
     def answer(
         self,
@@ -296,15 +297,38 @@ class RAGService:
         max_tokens: int = 1024,
         generate: bool = True,
     ) -> Dict[str, Any]:
+        print(
+            "[DEBUG][answer] args:",
+            {"max_tokens": max_tokens, "generate": generate, "model": model},
+            file=sys.stderr,
+        )
         hits = self.retrieve(query, k=k)
         if not hits:
-            return {"answer": "[No results found]", "hits": []}
+            return {
+                "answer": "[No results found]",
+                "hits": [],
+                "used": {
+                    "max_tokens": max_tokens,
+                    "answer_len": 0,
+                    "finish_reason": "no_hits",
+                },
+            }
         if not generate:
-            return {"answer": "\n---\n".join(h["text"] for h in hits), "hits": hits}
+            ans = "\n---\n".join(h["text"] for h in hits)
+            return {
+                "answer": ans,
+                "hits": hits,
+                "used": {
+                    "max_tokens": max_tokens,
+                    "answer_len": len(ans),
+                    "finish_reason": "retrieve_only",
+                },
+            }
 
-        return {
-            "answer": self.call_llamacpp(
-                self.build_prompt(query, hits), model_path=model, max_tokens=max_tokens
-            ),
-            "hits": hits,
-        }
+        out = self.call_llamacpp(
+            self.build_prompt(query, hits), model_path=model, max_tokens=max_tokens
+        )
+
+        used = {"max_tokens": max_tokens, "answer_len": len(out)}
+        print("[DEBUG][answer] produced len:", len(out), file=sys.stderr)
+        return {"answer": out, "hits": hits, "used": used}
