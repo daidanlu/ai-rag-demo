@@ -97,10 +97,17 @@ class QueryAPIView(APIView):
             gen = gen.strip().lower() in ("1", "true", "yes", "y")
 
         try:
+            raw_max = request.data.get("max_tokens", validated.get("max_tokens", 750))
+            try:
+                max_tokens = int(raw_max)
+            except Exception:
+                max_tokens = 750
+
             result = rag_service.answer(
                 query=validated["query"],
                 k=validated.get("k", 4),
                 generate=gen,
+                max_tokens=max_tokens,
             )
 
             if result.get("answer", "").startswith("[ERROR]"):
@@ -119,6 +126,7 @@ class QueryAPIView(APIView):
                     "status": "success",
                     "answer": result.get("answer", "No answer generated."),
                     "sources": result.get("hits", []),
+                    "used": result.get("used", {}),
                 },
                 status=status.HTTP_200_OK,
             )

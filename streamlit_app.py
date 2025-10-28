@@ -235,6 +235,16 @@ show_retrieval = st.toggle(
     help="Display top-K retrieved chunks with scores and source metadata.",
 )
 
+# Max tokens slider (controls answer length)
+max_tokens = st.slider(
+    "Max tokens for answer",
+    min_value=200,
+    max_value=2000,
+    value=750,
+    step=50,
+    help="Upper bound for generated answer length; increase if answers are cut off.",
+)
+
 if run_btn and q.strip():
     try:
         with st.spinner("Querying Django API and processing response..."):
@@ -245,12 +255,15 @@ if run_btn and q.strip():
                 "k": k,
                 "generate": not dry,
             }
+
             if model.strip():
                 payload["model"] = model.strip()
 
+            payload["max_tokens"] = int(max_tokens)
+
             # send POST request to Django Query API, choose endpoint by 'dry' flag
             url = QUERY_RETRIEVE_URL if dry else QUERY_URL
-            response = requests.post(url, json=payload, timeout=180)
+            response = requests.post(url, json=payload, timeout=900)
 
             # check connection error
             if response.status_code == 500:
@@ -277,7 +290,11 @@ if run_btn and q.strip():
 
             # success or after LLM failure 500 fallback
             data = response.json() if response.status_code == 200 else data
-            res = {"answer": data.get("answer", ""), "hits": data.get("sources", [])}
+            res = {
+                "answer": data.get("answer", ""),
+                "hits": data.get("sources", []) or data.get("hits", []),
+                "used": data.get("used", {}),
+            }
             elapsed_ms = round((time.time() - start_ts) * 1000, 1)  # timing ends
 
             # display results
@@ -293,6 +310,21 @@ if run_btn and q.strip():
                 disabled=True,
                 key="answer_box",
             )
+
+            if res.get("used"):
+                used = res["used"]
+                colu1, colu2, colu3 = st.columns([1, 1, 1])
+                colu1.metric("used.max_tokens", used.get("max_tokens", "—"))
+                colu2.metric("answer_len", used.get("answer_len", "—"))
+                colu3.metric("latency_ms", elapsed_ms)
+                with st.expander("Show generation stats (debug)"):
+                    st.json(
+                        {
+                            "payload.max_tokens_sent": int(max_tokens),
+                            "backend.used": used,
+                            "generate_flag": (not dry),
+                        }
+                    )
 
             if show_retrieval:
                 st.markdown("### Retrieval Sources")
