@@ -56,6 +56,18 @@ A simple, local web interface for interacting with the Django Backend Service.
 - Optional **retrieval inspector toggle** to show top-K retrieved chunks with scores and sources
 
 
+### Adjustable Answer Length (max_tokens)
+
+The Streamlit interface now allows adjusting the **LLM answer length** per query using a
+*Max Tokens* slider (200–2000). Full-length answers are displayed without truncation,
+and the actual token usage is reported in the debug panel below the response:
+
+- `payload.max_tokens_sent` → slider value
+- `backend.used.max_tokens` → actual tokens generated
+- `backend.used.answer_len` → length of final answer
+
+---
+ ### CLI Support
 ```bash
 # 1. Start Backend
 # Ensure the Django service is running (see section A above)
@@ -68,6 +80,7 @@ streamlit run streamlit_app.py
 Note: The Streamlit client uses the Python `requests` library to communicate via HTTP with the Django API.
 
 ---
+
 
 ### Multi-PDF Upload & Progress
 
