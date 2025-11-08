@@ -239,9 +239,9 @@ show_retrieval = st.toggle(
 max_tokens = st.slider(
     "Max tokens for answer",
     min_value=200,
-    max_value=2000,
-    value=750,
-    step=50,
+    max_value=1500,
+    value=500,
+    step=100,
     help="Upper bound for generated answer length; increase if answers are cut off.",
 )
 

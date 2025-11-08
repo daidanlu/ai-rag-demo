@@ -59,7 +59,7 @@ A simple, local web interface for interacting with the Django Backend Service.
 ### Adjustable Answer Length (max_tokens)
 
 The Streamlit interface now allows adjusting the **LLM answer length** per query using a
-*Max Tokens* slider (200–2000). Full-length answers are displayed without truncation,
+*Max Tokens* slider (200–1500). Full-length answers are displayed without truncation,
 and the actual token usage is reported in the debug panel below the response:
 
 - `payload.max_tokens_sent` → slider value
