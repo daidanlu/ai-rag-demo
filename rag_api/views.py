@@ -191,12 +191,19 @@ def health(request):
             # 2) check collection (also returns points_count)
             r1 = requests.get(f"{url}/collections/{coll}", timeout=5)
             collection_ok = r1.status_code == 200
-            points_count = None
+            # use /points/count to get vectors
+            points_count = 0
             if collection_ok:
                 try:
-                    points_count = r1.json().get("result", {}).get("points_count")
+                    rc = requests.post(
+                        f"{url}/collections/{coll}/points/count",
+                        json={"exact": True},
+                        timeout=5,
+                    )
+                    if rc.status_code == 200:
+                        points_count = rc.json().get("result", {}).get("count", 0)
                 except Exception:
-                    pass
+                    points_count = 0
 
             info["qdrant"]["server_ok"] = server_ok
             info["qdrant"]["collection_ok"] = collection_ok

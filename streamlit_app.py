@@ -311,21 +311,6 @@ if run_btn and q.strip():
                 key="answer_box",
             )
 
-            if res.get("used"):
-                used = res["used"]
-                colu1, colu2, colu3 = st.columns([1, 1, 1])
-                colu1.metric("used.max_tokens", used.get("max_tokens", "—"))
-                colu2.metric("answer_len", used.get("answer_len", "—"))
-                colu3.metric("latency_ms", elapsed_ms)
-                with st.expander("Show generation stats (debug)"):
-                    st.json(
-                        {
-                            "payload.max_tokens_sent": int(max_tokens),
-                            "backend.used": used,
-                            "generate_flag": (not dry),
-                        }
-                    )
-
             if show_retrieval:
                 st.markdown("### Retrieval Sources")
                 hits = res.get("hits", [])

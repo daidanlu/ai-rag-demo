@@ -98,15 +98,53 @@ Example workflow:
 
 
 ---
-
 ## Demo Screenshots
 
-![Streamlit RAG Demo Screenshot](assets/streamlit-demo-1.png)
-![Streamlit RAG Demo Screenshot](assets/streamlit-demo-2.png)
-![Streamlit RAG Demo Screenshot](assets/streamlit-demo-3.png)
-![Full-Stack RAG Demo Screenshot](assets/fullstack-demo-1.png)
-![Full-Stack RAG Demo Screenshot](assets/fullstack-demo-2.png)
+<details>
+<summary><b>📸 Click to view updated UI screenshots</b></summary>
 
+<p align="center">
+  <img src="assets/streamlit-demo-1.png" width="65%"><br>
+</p>
+
+<p align="center">
+  <img src="assets/streamlit-demo-2.png" width="65%"><br>
+</p>
+
+<p align="center">
+  <img src="assets/streamlit-demo-3.png" width="65%"><br>
+</p>
+
+<p align="center">
+  <img src="assets/fullstack-demo-1.png" width="65%"><br>
+</p>
+
+<p align="center">
+  <img src="assets/fullstack-demo-2.png" width="65%"><br>
+</p>
+
+<p align="center">
+  <img src="assets/Snipaste_2025-11-10_23-18-59.png" width="65%"><br>
+</p>
+
+<p align="center">
+  <img src="assets/Snipaste_2025-11-10_23-20-03.png" width="65%"><br>
+</p>
+
+<p align="center">
+  <img src="assets/Snipaste_2025-11-10_23-21-02.png" width="65%"><br>
+</p>
+
+<p align="center">
+  <img src="assets/Snipaste_2025-11-10_23-22-44.png" width="65%"><br>
+</p>
+
+<p align="center">
+  <img src="assets/Snipaste_2025-11-10_23-23-00.png" width="65%"><br>
+</p>
+
+
+</details>
 ---
 
 ## RAG API Endpoints (Django REST Framework)
