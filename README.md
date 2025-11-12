@@ -255,6 +255,9 @@ python main.py ask "What is the document about?" --k 4
 $env:RAG_STORAGE="memory"   # PowerShell
 # or
 export RAG_STORAGE=memory   # bash/zsh
+
+> Optional: set `RESET_ON_STARTUP=true` to auto-clear the Qdrant collection on backend start.
+
 ```
 
 ---

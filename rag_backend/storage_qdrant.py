@@ -4,25 +4,56 @@ import requests
 from typing import List, Dict
 from uuid import uuid4  # to generate valid Qdrant id
 
-QDRANT_URL = os.getenv("QDRANT_URL", "http://127.0.0.1:6333")  # default Qdrant url
+QDRANT_URL = os.getenv("QDRANT_URL", "http://127.0.0.1:6333").rstrip(
+    "/"
+)  # default Qdrant url
 QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "chunks")
 EMBED_DIM = int(os.getenv("EMBED_DIM", "384"))
-DISTANCE = os.getenv("QDRANT_DISTANCE", "Cosine")
+# Normalize distance to Qdrant expected enum strings
+_dist_raw = (os.getenv("QDRANT_DISTANCE", "cosine") or "").strip().lower()
+if _dist_raw in ("cosine", "cos"):
+    DISTANCE = "Cosine"
+elif _dist_raw in ("dot", "dotproduct", "dot_product"):
+    DISTANCE = "Dot"
+elif _dist_raw in ("euclid", "l2", "euclidean"):
+    DISTANCE = "Euclid"
+else:
+    DISTANCE = "Cosine"
 
 
 class QdrantStorage:
     def __init__(self):
+        # optional: clear Qdrant collection on startup if env var is set
+        reset_on_startup = os.getenv("RESET_ON_STARTUP", "false").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        if reset_on_startup:
+            try:
+                requests.delete(
+                    f"{QDRANT_URL}/collections/{QDRANT_COLLECTION}", timeout=10
+                )
+                print(
+                    f"[INIT] Qdrant collection '{QDRANT_COLLECTION}' cleared on startup."
+                )
+            except Exception as e:
+                print(f"[INIT] Qdrant clear failed: {e}")
         self._ensure_collection()
 
-    # Create-if-not-exists. Qdrant returns 409 if the collection already exists.Treat 200/409 as OK; only raise for other codes.
+    # Create-if-not-exists (idempotent). Qdrant returns 409 if already exists.
     def _ensure_collection(self) -> None:
+        payload = {"vectors": {"size": EMBED_DIM, "distance": DISTANCE}}
         r = requests.put(
             f"{QDRANT_URL}/collections/{QDRANT_COLLECTION}",
-            json={"vectors": {"size": EMBED_DIM, "distance": DISTANCE}},
-            timeout=10,
+            json=payload,
+            timeout=15,
         )
         if r.status_code not in (200, 409):
             r.raise_for_status()
+        # sanity check: ensure collection schema exists
+        rc = requests.get(f"{QDRANT_URL}/collections/{QDRANT_COLLECTION}", timeout=10)
+        rc.raise_for_status()
 
     # to write into Qdrant
     def upsert(self, vectors, payloads):
@@ -61,16 +92,40 @@ class QdrantStorage:
         r.raise_for_status()
         return r.json().get("result", [])
 
+    def _wait_deleted(self, timeout_sec: int = 20):
+        """Poll until the collection is actually gone (DELETE may be async 202)."""
+        import time
+
+        deadline = time.time() + timeout_sec
+        while time.time() < deadline:
+            gr = requests.get(
+                f"{QDRANT_URL}/collections/{QDRANT_COLLECTION}", timeout=5
+            )
+            if gr.status_code == 404:
+                return True
+            time.sleep(0.3)
+        return False
+
     def clear(self) -> Dict:
-        # drop collection
+        # 1) drop collection (DELETE may return 202 while actual deletion is async)
         r_del = requests.delete(
             f"{QDRANT_URL}/collections/{QDRANT_COLLECTION}",
             timeout=30,
         )
-        # not exist
         if r_del.status_code not in (200, 202, 404):
             r_del.raise_for_status()
-
-        # rebuild collection
+        # 2) wait until it's actually deleted to avoid race with recreate
+        self._wait_deleted()
+        # 3) recreate with explicit vectors schema
         self._ensure_collection()
+        # 4) final sanity: points count should be zero
+        try:
+            rc = requests.post(
+                f"{QDRANT_URL}/collections/{QDRANT_COLLECTION}/points/count",
+                json={"exact": True},
+                timeout=10,
+            )
+            rc.raise_for_status()
+        except Exception:
+            pass
         return {"ok": True, "collection": QDRANT_COLLECTION, "reset": True}
