@@ -206,6 +206,8 @@ if ingest_btn:
         if fail_cnt > 0:
             st.warning(f"{fail_cnt}/{total} file(s) failed.")
 
+        # give toast/success messages time to be visible
+        time.sleep(2)
         # rerun to update，health vectors
         st.rerun()
 
