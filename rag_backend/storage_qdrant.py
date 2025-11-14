@@ -107,25 +107,21 @@ class QdrantStorage:
         return False
 
     def clear(self) -> Dict:
-        # 1) drop collection (DELETE may return 202 while actual deletion is async)
-        r_del = requests.delete(
-            f"{QDRANT_URL}/collections/{QDRANT_COLLECTION}",
+        """
+        Clear all points in the existing collection without touching its schema.
+        This avoids subtle DROP + CREATE issues and keeps vectors_config unchanged.
+        """
+        body = {
+            "filter": {
+                # empty "must" matches all points in the collection
+                "must": []
+            }
+        }
+        r = requests.post(
+            f"{QDRANT_URL}/collections/{QDRANT_COLLECTION}/points/delete",
+            json=body,
             timeout=30,
         )
-        if r_del.status_code not in (200, 202, 404):
-            r_del.raise_for_status()
-        # 2) wait until it's actually deleted to avoid race with recreate
-        self._wait_deleted()
-        # 3) recreate with explicit vectors schema
-        self._ensure_collection()
-        # 4) final sanity: points count should be zero
-        try:
-            rc = requests.post(
-                f"{QDRANT_URL}/collections/{QDRANT_COLLECTION}/points/count",
-                json={"exact": True},
-                timeout=10,
-            )
-            rc.raise_for_status()
-        except Exception:
-            pass
+        r.raise_for_status()
+
         return {"ok": True, "collection": QDRANT_COLLECTION, "reset": True}
