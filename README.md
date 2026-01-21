@@ -346,8 +346,7 @@ A new backend endpoint for resetting the vector index has been added. Supports b
 
 ## Notes
 
-```
-- All operations (embedding, retrieval, generation) run fully locally.
-- The vector index is stored under ./db/ and can be reused across sessions.
+- All operations (embedding, retrieval, generation) run fully locally; the vector index is stored under `./db/` and reused across sessions.
 - The GGUF model must be downloaded separately and placed in the project root.
-```
+- AI coding assistants were used as auxiliary tools (debugging/refactoring/boilerplate), while architecture and final changes were authored and validated by me.
+
